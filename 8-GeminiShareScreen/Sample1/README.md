@@ -20,8 +20,8 @@ Because of .gitignore file your API key will not be saved to git repository
 ## 🏁 Run
 
 To run the script:
-
-python geminiLiveAPI.py
+- Start your venv environment: `.venv\Scripts\Activate.ps1`
+- Run the code: `python geminiLiveAPI.py`
 
 ## 🚧 Troubleshoot
 
