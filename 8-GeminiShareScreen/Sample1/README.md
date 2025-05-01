@@ -4,6 +4,8 @@ This is a sample of using Gemini 2.0 to share screen
 
 Original source code: https://github.com/google-gemini/cookbook/blob/main/quickstarts/Get_started_LiveAPI.py
 
+With this sample you cannot choose the screen to share. The screen are shared automatically.
+
 ## 🔧 Setup
 
 Tested on Windows:
