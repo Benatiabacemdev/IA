@@ -1,0 +1,42 @@
+version: "3.9"
+
+services:
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "11434:11434"
+    # networks:
+      # - private_net
+    volumes:
+      - ollama_storage:/root/.ollama
+      
+  qdrant:
+    image: qdrant/qdrant
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+    # networks:
+      # - private_net
+    volumes:
+      - qdrant_storage:/qdrant/storage
+
+volumes:
+  qdrant_storage:
+    external: true # to use existing volumes
+  ollama_storage:
+    external: true # to use existing volumes
+    
+# networks:
+  # public_net:
+    # driver: bridge
+  # private_net:
+    # driver: bridge
+    # internal: true
