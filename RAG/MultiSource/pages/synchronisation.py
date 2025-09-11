@@ -49,7 +49,7 @@ def sync_local_documents():
     st.write("Select the folder containing your PDF documents to synchronize with the vector store and database.")
     col1, col2 = st.columns([1,6])
     with col1:
-        folder_select_button = st.button("Select Folder")
+        folder_select_button = st.button("Select Folder", key="select_folder")
     if folder_select_button:
         selected_folder_path = select_folder()
     with col2:
@@ -57,7 +57,7 @@ def sync_local_documents():
             st.session_state.folderPath = selected_folder_path
             st.write("Selected folder path:", selected_folder_path)
     if selected_folder_path:
-        sync_documents_button = st.button("Syncronize documents")
+        sync_documents_button = st.button("Syncronize documents", key="sync_documents")
         if sync_documents_button:
             with st.spinner("Synchronizing documents..."):
                 dbHelper = PostgresHelper()
@@ -105,7 +105,7 @@ def sync_local_documents():
                 st.success("Documents synchronized successfully!")
 
 def sync_sharepoint_documents():
-    sync_documents_button = st.button("Syncronize documents")
+    sync_documents_button = st.button("Syncronize documents", key="sync_sp_documents")
     if sync_documents_button:
         with st.spinner("Synchronizing documents..."):
             spHelper = SharePointHelper()

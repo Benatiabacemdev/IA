@@ -1,0 +1,19 @@
+-- Adminer 5.3.0 PostgreSQL 17.6 dump
+
+DROP TABLE IF EXISTS "documents";
+DROP SEQUENCE IF EXISTS documents_id_seq;
+CREATE SEQUENCE documents_id_seq INCREMENT 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1;
+
+CREATE TABLE "public"."documents" (
+    "id" integer DEFAULT nextval('documents_id_seq') NOT NULL,
+    "filename" character varying(50) NOT NULL,
+    "filepath" character varying(250) NOT NULL,
+    "modifieddate" timestamp NOT NULL,
+    "createddate" timestamp NOT NULL,
+    "size" numeric NOT NULL,
+    "uids" text NOT NULL,
+    CONSTRAINT "documents_pkey" PRIMARY KEY ("id")
+)
+WITH (oids = false);
+
+-- 2025-09-11 21:02:47 UTC

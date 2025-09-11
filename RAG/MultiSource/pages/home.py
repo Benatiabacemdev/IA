@@ -49,8 +49,7 @@ def showResponses():
 
 def main():
     
-    st.set_page_config(page_title="Chat with multiple PDFs",
-                       page_icon=":books:")
+    st.set_page_config(page_title="Local RAG - MultiSources") #,page_icon=":books:")
     st.write(css, unsafe_allow_html=True)
 
     with st.spinner("Initialisation...", show_time=True):
@@ -67,7 +66,7 @@ def main():
         if "chat_history" not in st.session_state:
             st.session_state.chat_history = None
 
-    st.header("Chat with multiple PDFs")
+    st.markdown("<h1 style='text-align: center'>Local RAG - MultiSources</h1>", unsafe_allow_html=True)
 
     if prompt := st.chat_input("Ask a question"):
         response = st.session_state.conversation({'question': prompt})
