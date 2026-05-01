@@ -2,6 +2,7 @@ import psycopg2
 import os
 
 from models.document import DocumentModel
+from models.folder import FolderModel
 
 class PostgresHelper:
     def __init__(self):
@@ -40,6 +41,49 @@ class PostgresHelper:
             self.conn.rollback()
             return False
         
+    def add_selected_folder(self, folder_path, source_type="local"):
+        try:
+            self.cur.execute(
+                "INSERT INTO selected_folders (folder_path, source_type) VALUES (%s, %s) ON CONFLICT (folder_path) DO NOTHING;",
+                (folder_path, source_type)
+            )
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error adding selected folder: {e}")
+            self.conn.rollback()
+            return False
+
+    def get_selected_folder(self, folder_path):
+        try:
+            self.cur.execute("SELECT * FROM selected_folders WHERE folder_path = %s;", (folder_path,))
+            row = self.cur.fetchone()
+            if row:
+                return FolderModel(*row)
+            return None
+        except Exception as e:
+            print(f"Error getting selected folder: {e}")
+            return None
+
+    def get_all_selected_folders(self):
+        try:
+            self.cur.execute("SELECT * FROM selected_folders ORDER BY selected_date DESC;")
+            rows = self.cur.fetchall()
+            return [FolderModel(*row) for row in rows]
+        except Exception as e:
+            print(f"Error getting selected folders: {e}")
+            return []
+
+    def delete_selected_folder(self, folder_path):
+        try:
+            self.cur.execute("DELETE FROM selected_folders WHERE folder_path = %s;", (folder_path,))
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error deleting selected folder: {e}")
+            self.conn.rollback()
+            return False
+
     def close(self):
         self.cur.close()
         self.conn.close()

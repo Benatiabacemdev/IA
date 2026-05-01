@@ -26,6 +26,8 @@ def select_folder():
     from tkinter import filedialog
     root = tk.Tk()
     root.withdraw()
+    root.lift()
+    root.attributes('-topmost', True)
     folder_path = filedialog.askdirectory()
     root.destroy()
     return folder_path
@@ -45,19 +47,40 @@ def add_document(dbHelper, document: DocumentModel, raw_text):
     dbHelper.insert_document(document)
 
 def sync_local_documents():
+    # Load saved folders from DB
+    dbHelper = PostgresHelper()
+    saved_folders = dbHelper.get_all_selected_folders()
+    dbHelper.close()
+
     selected_folder_path = st.session_state.get("folderPath", None)
-    st.write("Select the folder containing your PDF documents to synchronize with the vector store and database.")
-    col1, col2 = st.columns([1,6])
-    with col1:
-        folder_select_button = st.button("Select Folder", key="select_folder")
-    if folder_select_button:
-        selected_folder_path = select_folder()
-    with col2:
-        if selected_folder_path:
-            st.session_state.folderPath = selected_folder_path
-            st.write("Selected folder path:", selected_folder_path)
+
+    if saved_folders:
+        st.subheader("Saved folders")
+        folder_options = {f.folder_path: f for f in saved_folders}
+        folder_labels = list(folder_options.keys())
+        default_index = folder_labels.index(selected_folder_path) if selected_folder_path in folder_labels else 0
+        chosen = st.radio(
+            "Select a folder to synchronize:",
+            options=folder_labels,
+            index=default_index,
+            key="folder_radio"
+        )
+        st.session_state.folderPath = chosen
+        selected_folder_path = chosen
+    else:
+        st.info("No saved folders. Add a new folder below.")
+
+    if st.button("＋ Add new folder", key="select_folder"):
+        new_path = select_folder()
+        if new_path:
+            dbHelper = PostgresHelper()
+            dbHelper.add_selected_folder(new_path, "local")
+            dbHelper.close()
+            st.session_state.folderPath = new_path
+            st.rerun()
+
     if selected_folder_path:
-        sync_documents_button = st.button("Syncronize documents", key="sync_documents")
+        sync_documents_button = st.button("Synchronize documents", key="sync_documents")
         if sync_documents_button:
             with st.spinner("Synchronizing documents..."):
                 dbHelper = PostgresHelper()
