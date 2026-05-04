@@ -73,7 +73,7 @@ def sync_local_documents():
             folder_labels = [f.folder_path for f in saved_folders]
             default_index = folder_labels.index(selected_folder_path) if selected_folder_path in folder_labels else 0
             chosen = st.radio(
-                label="",
+                label="Select folder",
                 options=folder_labels,
                 index=default_index,
                 format_func=lambda p: f"📁  {p}",

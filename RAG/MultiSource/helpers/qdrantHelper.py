@@ -17,7 +17,13 @@ class QdrantHelper:
         embeddings = OllamaEmbeddings(model=embedding_model)
         vector_size = len(embeddings.embed_query("test"))
 
-        client = QdrantClient(self.location, port=self.port, https=False, api_key=self.api_key)
+        use_https = str(os.getenv("DB_QD_HTTPS", "false")).lower() == "true"
+        client = QdrantClient(
+            self.location,
+            port=self.port,
+            https=use_https,
+            api_key=self.api_key if use_https else None,
+        )
         if not client.collection_exists(self.collection_name):
             client.create_collection(
                 collection_name=self.collection_name,
