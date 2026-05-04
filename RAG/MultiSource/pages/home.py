@@ -2,34 +2,92 @@ import streamlit as st
 from helpers.qdrantHelper import QdrantHelper
 from templates.htmlTemplates import css, bot_template, user_template
 from dotenv import load_dotenv
-from langchain.memory import ConversationBufferMemory
-from langchain.chains import ConversationalRetrievalChain
 from langchain_ollama import OllamaLLM
+from langchain.prompts import PromptTemplate
+from langchain.schema import HumanMessage, AIMessage
+from helpers.confidenceRetriever import ConfidenceRetriever
 
 import re
 import os
+import time
+import requests
 
 load_dotenv("./env/.env")
 
 st.set_page_config(layout="wide")
 
 llmName = os.getenv("LLM_NAME")
+llmUrl = os.getenv("LLM_URL")
 
-def get_conversation_chain(vectorstore):
-    llm = OllamaLLM(model=llmName,base_url=os.getenv("LLM_URL"))
+def get_available_models():
+    try:
+        response = requests.get(f"{llmUrl}/api/tags")
+        if response.status_code == 200:
+            models_data = response.json()
+            if models_data.get("models"):
+                return sorted([model["name"] for model in models_data["models"]])
+        return [llmName]
+    except Exception as e:
+        st.warning(f"Could not fetch models from Ollama: {e}")
+        return [llmName]
 
-    memory = ConversationBufferMemory(
-        memory_key='chat_history', return_messages=True)
-    conversation_chain = ConversationalRetrievalChain.from_llm(
-        llm=llm,
-        retriever=vectorstore.as_retriever(),
-        memory=memory
+QA_TEMPLATE = """You are a helpful assistant. You are given a context and a question.
+The context contains relevant information. Extract and synthesize an answer from it.
+Do NOT use any external knowledge. Do NOT make up information not present in the context.
+
+Context:
+{context}
+
+Question: {question}
+
+Answer:"""
+
+QA_PROMPT = PromptTemplate(
+    template=QA_TEMPLATE,
+    input_variables=["context", "question"]
+)
+
+NO_CONTEXT_ANSWER = "I don't have enough information in my knowledge base to answer that question."
+
+def init_llm(vectorstore, model_name=None):
+    if model_name is None:
+        model_name = llmName
+    llm = OllamaLLM(model=model_name, base_url=llmUrl, think=False)
+    retriever = ConfidenceRetriever(
+        vectorstore=vectorstore,
+        similarity_threshold=0.65,
+        k=5
     )
-    return conversation_chain
+    return llm, retriever
 
-def inputchange():
-    response = st.session_state.conversation({'question': st.session_state.input})
-    st.session_state.chat_history = response['chat_history']
+def handle_question(question):
+    t0 = time.perf_counter()
+
+    raw_results = st.session_state.retriever.vectorstore.similarity_search_with_score(question, k=5)
+    st.session_state.debug_scores = [(round(score, 4), doc.page_content[:60]) for doc, score in raw_results]
+
+    docs = st.session_state.retriever._get_relevant_documents(question)
+    retrieval_time = st.session_state.retriever.last_retrieval_time
+
+    if not docs:
+        answer = NO_CONTEXT_ANSWER
+        llm_time = 0.0
+    else:
+        context = "\n\n".join(doc.page_content for doc in docs)
+        prompt = QA_PROMPT.format(context=context, question=question)
+        answer = st.session_state.llm.invoke(prompt)
+        llm_time = time.perf_counter() - t0 - retrieval_time
+
+    if st.session_state.chat_history is None:
+        st.session_state.chat_history = []
+    st.session_state.chat_history.append(HumanMessage(content=question))
+    st.session_state.chat_history.append(AIMessage(content=answer))
+
+    st.session_state.last_timings = {
+        "retrieval": retrieval_time,
+        "llm": llm_time,
+        "total": time.perf_counter() - t0,
+    }
 
 def showResponses():
     if st.session_state.chat_history:
@@ -48,30 +106,55 @@ def showResponses():
     st.session_state.input = ""
 
 def main():
-    
+
     st.set_page_config(page_title="Local RAG - MultiSources") #,page_icon=":books:")
     st.write(css, unsafe_allow_html=True)
 
-    with st.spinner("Initialisation...", show_time=True):
-        qdrantHelper = QdrantHelper()
-        if "qdrantClient" not in st.session_state:
-            st.session_state.qdrantClient = qdrantHelper.client
+    # Sidebar for model selection
+    with st.sidebar:
+        st.header("⚙️ Configuration")
+        available_models = get_available_models()
 
-        if "vectorestore" not in st.session_state:
-            # create vector store
-            st.session_state.vectorstore = qdrantHelper.get_vectorstore(llmName)
-        if "conversation" not in st.session_state:
-            # create conversation chain
-            st.session_state.conversation = get_conversation_chain(st.session_state.vectorstore)
+        if "selected_model" not in st.session_state:
+            st.session_state.selected_model = llmName
+
+        new_model = st.selectbox(
+            "Select LLM Model:",
+            options=available_models,
+            index=available_models.index(st.session_state.selected_model) if st.session_state.selected_model in available_models else 0,
+            key="model_selector"
+        )
+
+        if new_model != st.session_state.selected_model:
+            st.session_state.selected_model = new_model
+            st.session_state.llm, st.session_state.retriever = init_llm(st.session_state.vectorstore, new_model)
+            st.rerun()
+
+    with st.spinner("Initialisation...", show_time=True):
+        if "qdrantClient" not in st.session_state:
+            qdrantHelper = QdrantHelper()
+            st.session_state.qdrantClient = qdrantHelper.client
+            st.session_state.qdrantHelper = qdrantHelper
+
+        if "vectorstore" not in st.session_state:
+            st.session_state.vectorstore = st.session_state.qdrantHelper.get_vectorstore()
+        if "llm" not in st.session_state:
+            st.session_state.llm, st.session_state.retriever = init_llm(st.session_state.vectorstore, st.session_state.selected_model)
         if "chat_history" not in st.session_state:
             st.session_state.chat_history = None
 
     st.markdown("<h1 style='text-align: center'>Local RAG - MultiSources</h1>", unsafe_allow_html=True)
 
     if prompt := st.chat_input("Ask a question"):
-        response = st.session_state.conversation({'question': prompt})
-        st.session_state.chat_history = response['chat_history']
+        handle_question(prompt)
         showResponses()
+        if "last_timings" in st.session_state:
+            t = st.session_state.last_timings
+            st.caption(f"⏱ Retrieval: {t['retrieval']:.2f}s | LLM: {t['llm']:.2f}s | Total: {t['total']:.2f}s")
+        if "debug_scores" in st.session_state:
+            with st.expander("🔍 Debug scores"):
+                for score, snippet in st.session_state.debug_scores:
+                    st.caption(f"score={score} | {snippet}...")
 
 if __name__ == '__main__':
     main()

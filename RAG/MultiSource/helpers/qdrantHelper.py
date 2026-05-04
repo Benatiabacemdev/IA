@@ -12,23 +12,39 @@ class QdrantHelper:
         self.collection_name = os.getenv("DB_QD_COLLECTION_NAME")
         self.client = self.connect()
 
-    def connect(self):        
+    def connect(self):
+        embedding_model = os.getenv("EMBEDDING_MODEL", "mxbai-embed-large")
+        embeddings = OllamaEmbeddings(model=embedding_model)
+        vector_size = len(embeddings.embed_query("test"))
+
         client = QdrantClient(self.location, port=self.port, https=False, api_key=self.api_key)
-        if(not client.collection_exists(self.collection_name)):
+        if not client.collection_exists(self.collection_name):
             client.create_collection(
                 collection_name=self.collection_name,
-                vectors_config=VectorParams(size=1024, distance=Distance.COSINE),
+                vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
             )
         return client
 
-    def get_vectorstore(self, llmName):
-        embeddings = OllamaEmbeddings(model=llmName)
+    def get_vectorstore(self):
+        embedding_model = os.getenv("EMBEDDING_MODEL", "mxbai-embed-large")
+        embeddings = OllamaEmbeddings(model=embedding_model)
         vectorstore = QdrantVectorStore(client=self.client, collection_name=self.collection_name, embedding=embeddings)
         return vectorstore
     
     def add_ToVectorStore(self, texts, vectorstore):
         return vectorstore.add_texts(texts=texts)
     
+    def points_exist(self, uids: list[str]) -> bool:
+        try:
+            results = self.client.retrieve(
+                collection_name=self.collection_name,
+                ids=uids,
+                with_vectors=False,
+            )
+            return len(results) > 0
+        except Exception:
+            return False
+
     def delete_points(self, uids):
         try:
             self.client.delete(
