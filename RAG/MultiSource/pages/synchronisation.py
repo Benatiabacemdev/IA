@@ -60,7 +60,7 @@ def sync_local_documents():
         with col_lbl:
             st.caption("Folders")
         with col_btn:
-            if st.button("＋ Add folder", key="select_folder", use_container_width=True):
+            if st.button("＋ Add folder", key="select_folder", width='stretch'):
                 new_path = select_folder()
                 if new_path:
                     dbHelper = PostgresHelper()
@@ -107,7 +107,7 @@ def sync_local_documents():
                                 size = os.path.getsize(fileFullPath) / 1000
                                 new_row = pd.DataFrame([[fileName, modifiedStamp, createdStamp, size, "Pending"]], columns=st.session_state.syncDataFrame.columns)
                                 st.session_state.syncDataFrame = pd.concat([st.session_state.syncDataFrame, new_row], ignore_index=True)
-                                table_placeholder.dataframe(st.session_state.syncDataFrame, use_container_width=True)
+                                table_placeholder.dataframe(st.session_state.syncDataFrame, width='stretch')
                                 documentExist = dbHelper.get_document(fileName, fileFullPath)
                                 status = "Synchronized: new"
                                 if documentExist is not None:
@@ -119,7 +119,7 @@ def sync_local_documents():
                                         and float(documentExist.size) == float(size)):
                                         status = "Already synchronized"
                                         st.session_state.syncDataFrame.at[len(st.session_state.syncDataFrame)-1, "Status"] = status
-                                        table_placeholder.dataframe(st.session_state.syncDataFrame, use_container_width=True)
+                                        table_placeholder.dataframe(st.session_state.syncDataFrame, width='stretch')
                                         continue
                                     else:
                                         deletedPoints = qdrantHelper.delete_points(documentExist.uids.split(","))
@@ -138,11 +138,11 @@ def sync_local_documents():
                                 raw_text = ragHelper.get_pdf_text(fileFullPath)
                                 add_document(dbHelper, newDocument, raw_text)
                                 st.session_state.syncDataFrame.at[len(st.session_state.syncDataFrame)-1, "Status"] = status
-                                table_placeholder.dataframe(st.session_state.syncDataFrame, use_container_width=True)
+                                table_placeholder.dataframe(st.session_state.syncDataFrame, width='stretch')
                     dbHelper.close()
                     st.success("Documents synchronized successfully!")
             elif "syncDataFrame" in st.session_state:
-                st.dataframe(st.session_state.syncDataFrame, use_container_width=True)
+                st.dataframe(st.session_state.syncDataFrame, width='stretch')
         else:
             st.caption("Select a folder on the left to start synchronization.")
 

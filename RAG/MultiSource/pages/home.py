@@ -60,7 +60,7 @@ def init_llm(vectorstore, model_name=None):
     )
     return llm, retriever
 
-def handle_question(question):
+def _fetch_answer(question):
     t0 = time.perf_counter()
 
     raw_results = st.session_state.retriever.vectorstore.similarity_search_with_score(question, k=5)
@@ -78,32 +78,23 @@ def handle_question(question):
         answer = st.session_state.llm.invoke(prompt)
         llm_time = time.perf_counter() - t0 - retrieval_time
 
-    if st.session_state.chat_history is None:
-        st.session_state.chat_history = []
-    st.session_state.chat_history.append(HumanMessage(content=question))
-    st.session_state.chat_history.append(AIMessage(content=answer))
-
     st.session_state.last_timings = {
         "retrieval": retrieval_time,
         "llm": llm_time,
         "total": time.perf_counter() - t0,
     }
+    return answer
 
-def showResponses():
+def showResponses(container):
     if st.session_state.chat_history:
-        messages = st.container(height=400)
         regex_pattern = r'<think>[\s\S]*?<\/think>\n\n'
-        for i, message in enumerate(st.session_state.chat_history):
-            if i % 2 == 0:
-                # st.write(user_template.replace(
-                # "{{MSG}}", message.content), unsafe_allow_html=True)
-                messages.chat_message("user").write(message.content)
-            else:
-                cleaned_content = re.sub(regex_pattern, '', message.content)
-                # st.write(bot_template.replace(
-                # "{{MSG}}", cleaned_content), unsafe_allow_html=True)
-                messages.chat_message("assistant").write(cleaned_content)
-    st.session_state.input = ""
+        with container:
+            for i, message in enumerate(st.session_state.chat_history):
+                if i % 2 == 0:
+                    st.chat_message("user").write(message.content)
+                else:
+                    cleaned_content = re.sub(regex_pattern, '', message.content)
+                    st.chat_message("assistant").write(cleaned_content)
 
 def main():
 
@@ -145,16 +136,31 @@ def main():
 
     st.markdown("<h1 style='text-align: center'>Local RAG - MultiSources</h1>", unsafe_allow_html=True)
 
+    messages_container = st.container(height=400)
+    showResponses(messages_container)
+
     if prompt := st.chat_input("Ask a question"):
-        handle_question(prompt)
-        showResponses()
-        if "last_timings" in st.session_state:
-            t = st.session_state.last_timings
-            st.caption(f"⏱ Retrieval: {t['retrieval']:.2f}s | LLM: {t['llm']:.2f}s | Total: {t['total']:.2f}s")
-        if "debug_scores" in st.session_state:
-            with st.expander("🔍 Debug scores"):
-                for score, snippet in st.session_state.debug_scores:
-                    st.caption(f"score={score} | {snippet}...")
+        if st.session_state.chat_history is None:
+            st.session_state.chat_history = []
+
+        st.session_state.chat_history.append(HumanMessage(content=prompt))
+
+        with messages_container:
+            st.chat_message("user").write(prompt)
+            with st.chat_message("assistant"):
+                with st.spinner(""):
+                    answer = _fetch_answer(prompt)
+
+        st.session_state.chat_history.append(AIMessage(content=answer))
+        st.rerun()
+
+    if "last_timings" in st.session_state:
+        t = st.session_state.last_timings
+        st.caption(f"⏱ Retrieval: {t['retrieval']:.2f}s | LLM: {t['llm']:.2f}s | Total: {t['total']:.2f}s")
+    if "debug_scores" in st.session_state:
+        with st.expander("🔍 Debug scores"):
+            for score, snippet in st.session_state.debug_scores:
+                st.caption(f"score={score} | {snippet}...")
 
 if __name__ == '__main__':
     main()
