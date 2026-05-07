@@ -37,8 +37,8 @@ class QdrantHelper:
         vectorstore = QdrantVectorStore(client=self.client, collection_name=self.collection_name, embedding=embeddings)
         return vectorstore
     
-    def add_ToVectorStore(self, texts, vectorstore):
-        return vectorstore.add_texts(texts=texts)
+    def add_ToVectorStore(self, texts, vectorstore, metadatas=None):
+        return vectorstore.add_texts(texts=texts, metadatas=metadatas)
     
     def points_exist(self, uids: list[str]) -> bool:
         try:

@@ -8,14 +8,14 @@ from helpers.ragHelper import RAGHelper
 from helpers.sharepointHelper import SharePointHelper
 from models.document import DocumentModel
 
-st.set_page_config(layout="wide")
-st.set_page_config(page_title="Synchronisation", page_icon=":directory_sync:")
+st.set_page_config(layout="wide", page_title="Synchronisation", page_icon="🔄")
 
 css = '''
 <style>
-    .stTabs .st-cr{ gap: 2rem;}
+    .stTabs .st-cr { gap: 2rem; }
     .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
-    font-size:2rem;
+        font-size: 1rem;
+        font-weight: 500;
     }
 </style>
 '''
@@ -40,9 +40,11 @@ def compare_datetimes(dt1, dt2):
         dt2 = dt2.replace(tzinfo=datetime.timezone.utc)
     return dt1.replace(microsecond=0) == dt2.replace(microsecond=0)
 
-def add_document(dbHelper, document: DocumentModel, raw_text):
+def add_document(dbHelper, document: DocumentModel, raw_text, source_type="local"):
     text_chunks = ragHelper.get_text_chunks(raw_text)
-    uids = qdrantHelper.add_ToVectorStore(text_chunks, st.session_state.vectorstore)
+    metadatas = [{"source": source_type, "filename": document.filename, "filepath": document.filepath}
+                 for _ in text_chunks]
+    uids = qdrantHelper.add_ToVectorStore(text_chunks, st.session_state.vectorstore, metadatas)
     document.uids = ",".join([str(uid) for uid in uids])
     dbHelper.insert_document(document)
 
@@ -136,7 +138,7 @@ def sync_local_documents():
                                     size=size,
                                     uids=None)
                                 raw_text = ragHelper.get_pdf_text(fileFullPath)
-                                add_document(dbHelper, newDocument, raw_text)
+                                add_document(dbHelper, newDocument, raw_text, source_type="local")
                                 st.session_state.syncDataFrame.at[len(st.session_state.syncDataFrame)-1, "Status"] = status
                                 table_placeholder.dataframe(st.session_state.syncDataFrame, width='stretch')
                     dbHelper.close()
@@ -190,7 +192,7 @@ def sync_sharepoint_documents():
                         size=size,
                         uids=None)
                     content = spHelper.get_pdf_text(file["driveId"], file["id"])
-                    add_document(dbHelper, newDocument, content)
+                    add_document(dbHelper, newDocument, content, source_type="sharepoint")
                     st.session_state.syncDataFrame.at[len(st.session_state.syncDataFrame)-1, "Status"] = status
                     table_placeholder.dataframe(st.session_state.syncDataFrame)
             dbHelper.close()
@@ -203,12 +205,12 @@ qdrantHelper = QdrantHelper()
 if "vectorstore" not in st.session_state:
     st.session_state.vectorstore = qdrantHelper.get_vectorstore()
 
-tab1, tab2 = st.tabs(["Local", "SharePoint"])
+tab1, tab2 = st.tabs(["🖥️  Local", "☁️  SharePoint"])
 with tab1:
-    st.header("Local folder synchronization")
+    st.subheader("🖥️  Local folder synchronization")
     sync_local_documents()
 with tab2:
-    st.header("SharePoint synchronization")
+    st.subheader("☁️  SharePoint synchronization")
     sync_sharepoint_documents()
 
 

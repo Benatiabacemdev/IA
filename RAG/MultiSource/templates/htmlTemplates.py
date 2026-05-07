@@ -152,6 +152,47 @@ css = '''
     border-right: 1px solid #e5e7eb !important;
 }
 
+/* ── Source badges ── */
+.source-badges {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
+
+.source-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    font-weight: 500;
+    padding: 2px 7px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    letter-spacing: 0.02em;
+    max-width: 420px;
+}
+
+.source-path {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 390px;
+    display: inline-block;
+}
+
+.source-local {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1d4ed8;
+}
+
+.source-sharepoint {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #15803d;
+}
+
 /* ── Expander (debug) ── */
 [data-testid="stExpander"] {
     border: 1px solid #e5e7eb !important;

@@ -60,6 +60,11 @@ def init_llm(vectorstore, model_name=None):
     )
     return llm, retriever
 
+SOURCE_META = {
+    "local":       ("🖥️", "Local",      "source-local"),
+    "sharepoint":  ("☁️", "SharePoint", "source-sharepoint"),
+}
+
 def _fetch_answer(question):
     t0 = time.perf_counter()
 
@@ -68,6 +73,11 @@ def _fetch_answer(question):
 
     docs = st.session_state.retriever._get_relevant_documents(question)
     retrieval_time = st.session_state.retriever.last_retrieval_time
+
+    sources = {
+        (doc.metadata["source"], doc.metadata.get("filepath", ""))
+        for doc in docs if doc.metadata.get("source")
+    }
 
     if not docs:
         answer = NO_CONTEXT_ANSWER
@@ -83,10 +93,25 @@ def _fetch_answer(question):
         "llm": llm_time,
         "total": time.perf_counter() - t0,
     }
-    return answer
+    return answer, sources
+
+def _source_badges_html(sources):
+    if not sources:
+        return ""
+    badges = []
+    for src, filepath in sorted(sources):
+        icon = SOURCE_META.get(src, ("📄", "", "source-local"))[0]
+        css  = SOURCE_META.get(src, ("📄", "", f"source-{src}"))[2]
+        label = filepath if filepath else src
+        badges.append(
+            f'<span class="source-badge {css}" title="{filepath}">'
+            f'{icon} <span class="source-path">{label}</span></span>'
+        )
+    return f'<div class="source-badges">{"".join(badges)}</div>'
 
 def showResponses(container):
     regex_pattern = r'<think>[\s\S]*?<\/think>\n\n'
+    sources_history = st.session_state.get("sources_history", [])
     with container:
         if not st.session_state.chat_history:
             st.markdown('''
@@ -97,12 +122,18 @@ def showResponses(container):
             </div>
             ''', unsafe_allow_html=True)
         else:
+            ai_idx = 0
             for i, message in enumerate(st.session_state.chat_history):
                 if i % 2 == 0:
                     st.chat_message("user").write(message.content)
                 else:
                     cleaned_content = re.sub(regex_pattern, '', message.content)
-                    st.chat_message("assistant").write(cleaned_content)
+                    msg_sources = sources_history[ai_idx] if ai_idx < len(sources_history) else set()
+                    with st.chat_message("assistant"):
+                        st.write(cleaned_content)
+                        if msg_sources:
+                            st.markdown(_source_badges_html(msg_sources), unsafe_allow_html=True)
+                    ai_idx += 1
 
 def main():
     st.write(css, unsafe_allow_html=True)
@@ -138,6 +169,8 @@ def main():
             st.session_state.llm, st.session_state.retriever = init_llm(st.session_state.vectorstore, st.session_state.selected_model)
         if "chat_history" not in st.session_state:
             st.session_state.chat_history = None
+        if "sources_history" not in st.session_state:
+            st.session_state.sources_history = []
 
     model_label = st.session_state.get("selected_model", llmName) or llmName
     st.markdown(f'''
@@ -163,9 +196,10 @@ def main():
             st.chat_message("user").write(prompt)
             with st.chat_message("assistant"):
                 with st.spinner(""):
-                    answer = _fetch_answer(prompt)
+                    answer, sources = _fetch_answer(prompt)
 
         st.session_state.chat_history.append(AIMessage(content=answer))
+        st.session_state.sources_history.append(sources)
         st.rerun()
 
     if "last_timings" in st.session_state:
