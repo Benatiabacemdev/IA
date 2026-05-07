@@ -1,6 +1,6 @@
 import streamlit as st
 from helpers.qdrantHelper import QdrantHelper
-from templates.htmlTemplates import css, bot_template, user_template
+from templates.htmlTemplates import css
 from dotenv import load_dotenv
 from langchain_ollama import OllamaLLM
 from langchain.prompts import PromptTemplate
@@ -14,7 +14,7 @@ import requests
 
 load_dotenv("./env/.env")
 
-st.set_page_config(layout="wide")
+st.set_page_config(page_title="Knowledge Base", layout="wide")
 
 llmName = os.getenv("LLM_NAME")
 llmUrl = os.getenv("LLM_URL")
@@ -86,9 +86,17 @@ def _fetch_answer(question):
     return answer
 
 def showResponses(container):
-    if st.session_state.chat_history:
-        regex_pattern = r'<think>[\s\S]*?<\/think>\n\n'
-        with container:
+    regex_pattern = r'<think>[\s\S]*?<\/think>\n\n'
+    with container:
+        if not st.session_state.chat_history:
+            st.markdown('''
+            <div class="empty-state">
+                <div class="empty-logo">🤖</div>
+                <p class="empty-title">Ready to assist</p>
+                <p class="empty-hint">Ask a question about your indexed documents</p>
+            </div>
+            ''', unsafe_allow_html=True)
+        else:
             for i, message in enumerate(st.session_state.chat_history):
                 if i % 2 == 0:
                     st.chat_message("user").write(message.content)
@@ -97,20 +105,17 @@ def showResponses(container):
                     st.chat_message("assistant").write(cleaned_content)
 
 def main():
-
-    st.set_page_config(page_title="Local RAG - MultiSources") #,page_icon=":books:")
     st.write(css, unsafe_allow_html=True)
 
-    # Sidebar for model selection
     with st.sidebar:
-        st.header("⚙️ Configuration")
+        st.markdown("#### ⚙ Configuration")
         available_models = get_available_models()
 
         if "selected_model" not in st.session_state:
             st.session_state.selected_model = llmName
 
         new_model = st.selectbox(
-            "Select LLM Model:",
+            "LLM Model",
             options=available_models,
             index=available_models.index(st.session_state.selected_model) if st.session_state.selected_model in available_models else 0,
             key="model_selector"
@@ -134,12 +139,21 @@ def main():
         if "chat_history" not in st.session_state:
             st.session_state.chat_history = None
 
-    st.markdown("<h1 style='text-align: center'>Local RAG - MultiSources</h1>", unsafe_allow_html=True)
+    model_label = st.session_state.get("selected_model", llmName) or llmName
+    st.markdown(f'''
+    <div class="rag-header">
+        <div class="rag-logo">🤖</div>
+        <div>
+            <div class="rag-title">Knowledge Base</div>
+            <div class="rag-model">LOCAL RAG &middot; <span>{model_label}</span></div>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
 
-    messages_container = st.container(height=400)
+    messages_container = st.container(height=700)
     showResponses(messages_container)
 
-    if prompt := st.chat_input("Ask a question"):
+    if prompt := st.chat_input("Ask a question about your documents…"):
         if st.session_state.chat_history is None:
             st.session_state.chat_history = []
 
@@ -156,7 +170,26 @@ def main():
 
     if "last_timings" in st.session_state:
         t = st.session_state.last_timings
-        st.caption(f"⏱ Retrieval: {t['retrieval']:.2f}s | LLM: {t['llm']:.2f}s | Total: {t['total']:.2f}s")
+        st.markdown(f'''
+        <div class="timing-row">
+            <span class="timing-seg">
+                <span class="timing-dot">●</span>
+                <span class="timing-label">retrieval</span>
+                <span class="timing-val">{t["retrieval"]:.2f}s</span>
+            </span>
+            <span class="timing-seg">
+                <span class="timing-dot">●</span>
+                <span class="timing-label">llm</span>
+                <span class="timing-val">{t["llm"]:.2f}s</span>
+            </span>
+            <span class="timing-seg">
+                <span class="timing-dot">●</span>
+                <span class="timing-label">total</span>
+                <span class="timing-val">{t["total"]:.2f}s</span>
+            </span>
+        </div>
+        ''', unsafe_allow_html=True)
+
     if "debug_scores" in st.session_state:
         with st.expander("🔍 Debug scores"):
             for score, snippet in st.session_state.debug_scores:
